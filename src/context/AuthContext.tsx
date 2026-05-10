@@ -206,6 +206,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
               });
             }
+          }, (error) => {
+            handleFirestoreError(error, OperationType.GET, profilePath, firebaseAuth);
           });
 
           // Set role for Owner if email matches
@@ -219,7 +221,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Listen to user metadata (role, status, subscription)
-          const unsubscribeMeta = onSnapshot(doc(firestoreDb, `users/${firebaseUser.uid}`), (snapshot) => {
+          const metaPath = `users/${firebaseUser.uid}`;
+          const unsubscribeMeta = onSnapshot(doc(firestoreDb, metaPath), (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
               setUser((prev: any) => ({
@@ -230,6 +233,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 subscriptionExpiry: data.subscriptionExpiry || null
               }));
             }
+          }, (error) => {
+            handleFirestoreError(error, OperationType.GET, metaPath, firebaseAuth);
           });
 
           const privatePath = `users/${firebaseUser.uid}/private/info`;
@@ -243,7 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setMyList(list);
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, listPath, firebaseAuth);
+            handleFirestoreError(error, OperationType.LIST, listPath, firebaseAuth);
           });
 
           // Listen to Watchlists
@@ -252,7 +257,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const lists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setWatchlists(lists);
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, watchlistsPath, firebaseAuth);
+            handleFirestoreError(error, OperationType.LIST, watchlistsPath, firebaseAuth);
           });
 
           // Listen to History
@@ -261,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const hist = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setViewingHistory(hist);
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, historyPath, firebaseAuth);
+            handleFirestoreError(error, OperationType.LIST, historyPath, firebaseAuth);
           });
 
         } else {
@@ -286,7 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
            return timeB - timeA;
         }));
       }, (error) => {
-        handleFirestoreError(error, OperationType.GET, reviewsPath, firebaseAuth);
+        handleFirestoreError(error, OperationType.LIST, reviewsPath, firebaseAuth);
       });
     };
 

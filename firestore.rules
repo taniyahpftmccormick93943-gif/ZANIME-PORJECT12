@@ -1,15 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // 3. Path Variable Hardening
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
+    
+    // --- Helper Primitives ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -19,208 +12,77 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+    // Hardcoded owner for bootstrapping
+    function isSystemOwner() {
+      return isSignedIn() && request.auth.token.email == 'taniyahpftmccormick93943@gmail.com';
     }
 
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    // 2. Validation Blueprints
-    function isValidUserProfile(data) {
-      return data.keys().hasAll(['displayName']) &&
-             data.keys().size() <= 3 &&
-             data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 50 &&
-             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1500000));
-    }
-
-    function isValidUserPrivateInfo(data) {
-      return data.keys().hasAll(['email']) &&
-             data.keys().size() == 1 &&
-             data.email is string && data.email.size() <= 100;
-    }
-
-    function isValidMovieSummary(data) {
-      return data.keys().hasAll(['id', 'title', 'imageUrl']) &&
-             data.keys().size() <= 10 &&
-             data.id is string && data.id.size() <= 100 &&
-             data.title is string && data.title.size() <= 200 &&
-             data.imageUrl is string && data.imageUrl.size() <= 1000;
-    }
-
-    function isValidWatchlist(data) {
-      return data.keys().hasAll(['name', 'createdAt']) &&
-             data.keys().size() <= 5 &&
-             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
-             data.createdAt == request.time;
-    }
-
-    function isValidHistory(data) {
-      return data.keys().hasAll(['movieId', 'lastWatched']) &&
-             data.keys().size() <= 5 &&
-             data.movieId is string && data.movieId.size() <= 100 &&
-             data.lastWatched == request.time &&
-             (!('progress' in data) || (data.progress is int && data.progress >= 0));
-    }
-
-    function isValidReview(data) {
-      return data.keys().hasAll(['movieId', 'userId', 'userName', 'rating', 'comment', 'createdAt']) &&
-             data.keys().size() <= 10 &&
-             data.movieId is string && data.movieId.size() <= 100 &&
-             data.userId == request.auth.uid &&
-             data.userName is string && data.userName.size() <= 100 &&
-             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
-             data.comment is string && data.comment.size() <= 1000 &&
-             data.createdAt == request.time;
-    }
-
-    function isValidMovieStats(data) {
-      return data.keys().hasAll(['viewCount']) &&
-             data.keys().size() == 1 &&
-             data.viewCount is int;
-    }
-
+    // Role-based access logic
     function isAdmin() {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Owner'];
+      return isSignedIn() && (
+        isSystemOwner() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Owner'])
+      );
     }
 
-    function isOwnerRole() {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Owner';
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    function isMovie(data) {
-      return data.keys().hasAll(['title', 'year', 'imageUrl']) &&
-             data.title is string && data.title.size() <= 200 &&
-             data.year is int &&
-             data.imageUrl is string && data.imageUrl.size() <= 2000000 &&
-             (!('description' in data) || (data.description is string && data.description.size() <= 5000)) &&
-             (!('server1Url' in data) || (data.server1Url is string && data.server1Url.size() <= 2000)) &&
-             (!('server2Url' in data) || (data.server2Url is string && data.server2Url.size() <= 2000)) &&
-             (!('isBanner' in data) || (data.isBanner is bool)) &&
-             (!('isPro' in data) || (data.isPro is bool)) &&
-             (!('seasonsCount' in data) || (data.seasonsCount is int)) &&
-             (!('status' in data) || (data.status in ['Ongoing', 'Finished'])) &&
-             (!('endYear' in data) || (data.endYear is string));
-    }
+    // --- Collection Rules ---
 
-    function isValidAppSettings(data) {
-      return data.keys().hasAll(['telegramLink', 'plan_1day', 'plan_1month', 'plan_3months', 'plan_6months', 'plan_1year']) &&
-             data.telegramLink is string && data.telegramLink.size() <= 1000 &&
-             data.plan_1day is number &&
-             data.plan_1month is number &&
-             data.plan_3months is number &&
-             data.plan_6months is number &&
-             data.plan_1year is number;
-    }
-
-    match /settings/app {
-      allow read: if true;
-      allow write: if isOwnerRole() && isValidAppSettings(incoming());
-    }
-
+    // Public Collections (Movies & Series)
     match /movies/{movieId} {
       allow read: if true;
-      allow create, update: if isAdmin() && isMovie(incoming());
-      allow delete: if isAdmin();
+      allow write: if isAdmin();
+
+      match /stats/data {
+        allow read: if true;
+        allow write: if isSignedIn();
+      }
     }
 
     match /series/{seriesId} {
       allow read: if true;
-      allow create, update: if isAdmin() && isMovie(incoming());
-      allow delete: if isAdmin();
+      allow write: if isAdmin();
 
-      match /seasons/{seasonId} {
+      match /{allPaths=**} {
         allow read: if true;
         allow write: if isAdmin();
-
-        match /episodes/{episodeId} {
-          allow read: if true;
-          allow write: if isAdmin();
-        }
-      }
-
-      match /stats/data {
-        allow read: if true;
-        allow create: if isValidMovieStats(incoming()) && (incoming().viewCount == 13728);
-        allow update: if isValidMovieStats(incoming()) && (
-          incoming().viewCount == existing().viewCount + 1
-        );
       }
     }
 
-    match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isOwner(userId) && isVerified();
-      allow update: if (isOwner(userId) && 
-                         incoming().get('role', 'User') == existing().get('role', 'User') &&
-                         incoming().get('subscriptionPlan', 'none') == existing().get('subscriptionPlan', 'none') &&
-                         incoming().get('subscriptionExpiry', '') == existing().get('subscriptionExpiry', '')
-                       ) || isAdmin();
-      allow delete: if isAdmin() && (!exists(/databases/$(database)/documents/users/$(userId)) || get(/databases/$(database)/documents/users/$(userId)).data.role != 'Owner');
-
-      match /profile/data {
-        allow read: if isSignedIn();
-        allow create, update: if isOwner(userId) && isVerified() && isValidUserProfile(incoming());
-        allow delete: if isOwner(userId) && isVerified();
-      }
-
-      match /private/info {
-        allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isVerified() && isValidUserPrivateInfo(incoming());
-        allow delete: if isOwner(userId) && isVerified();
-      }
-
-      match /myList/{movieId} {
-        allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isVerified() && isValidMovieSummary(incoming());
-        allow delete: if isOwner(userId) && isVerified();
-      }
-
-      match /watchlists/{listId} {
-        allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isVerified() && isValidWatchlist(incoming());
-        allow delete: if isOwner(userId) && isVerified();
-
-        match /movies/{movieId} {
-          allow read: if isOwner(userId);
-          allow create, update: if isOwner(userId) && isVerified() && isValidMovieSummary(incoming());
-          allow delete: if isOwner(userId) && isVerified();
-        }
-      }
-
-      match /history/{movieId} {
-        allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isVerified() && isValidHistory(incoming());
-        allow delete: if isOwner(userId) && isVerified();
-      }
-    }
-
-    match /movies/{movieId}/stats/data {
+    // Global Settings
+    match /settings/{settingId} {
       allow read: if true;
-      allow create: if isValidMovieStats(incoming()) && (incoming().viewCount == 13728);
-      allow update: if isValidMovieStats(incoming()) && (
-        incoming().viewCount == existing().viewCount + 1
-      );
+      allow write: if isAdmin();
     }
 
+    // User Data - Master Gate for all user content
+    match /users/{userId} {
+      // Allows user to read their own account info
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+
+      // Deep wildcard for all subcollections (myList, watchlists, history, private, profile)
+      match /{allPaths=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Reviews
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if isSignedIn() && isVerified() && isValidReview(incoming());
-      allow update: if isOwner(existing().userId) && isVerified() && isValidReview(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'createdAt']) &&
-                      incoming().movieId == existing().movieId &&
-                      incoming().userId == existing().userId;
-      allow delete: if isOwner(existing().userId) && isVerified();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Connection test document
+    match /test/connection {
+      allow read: if true;
     }
   }
 }
