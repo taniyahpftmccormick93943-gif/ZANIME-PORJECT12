@@ -147,6 +147,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubscribeReviews: any = null;
     let unsubscribeWatchlists: any = null;
     let unsubscribeHistory: any = null;
+    let unsubscribeMeta: any = null;
+    let unsubscribeProfile: any = null;
+
+    const cleanupUserListeners = () => {
+      if (unsubscribeList) { unsubscribeList(); unsubscribeList = null; }
+      if (unsubscribeProfile) { unsubscribeProfile(); unsubscribeProfile = null; }
+      if (unsubscribeMeta) { unsubscribeMeta(); unsubscribeMeta = null; }
+      if (unsubscribeWatchlists) { unsubscribeWatchlists(); unsubscribeWatchlists = null; }
+      if (unsubscribeHistory) { unsubscribeHistory(); unsubscribeHistory = null; }
+    };
 
     const init = async () => {
       const { auth: firebaseAuth, db: firestoreDb } = await setupFirebase();
@@ -169,6 +179,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+        cleanupUserListeners();
+        
         if (firebaseUser) {
           setUser(firebaseUser);
           
@@ -204,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Listen to profile changes (to get the large photoURL and latest name)
-          const unsubscribeProfile = onSnapshot(doc(firestoreDb, profilePath), (snapshot) => {
+          unsubscribeProfile = onSnapshot(doc(firestoreDb, profilePath), (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
               setUser((prev: any) => {
@@ -233,12 +245,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Listen to user metadata (role, status, subscription)
-          const unsubscribeMeta = onSnapshot(doc(firestoreDb, metaPath), (snapshot) => {
+          unsubscribeMeta = onSnapshot(doc(firestoreDb, metaPath), (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
               
               // CHECK FOR BAN
               if (data.status === 'Banned') {
+                cleanupUserListeners();
                 logout();
                 alert('ئەکاونتەکەت باند کراوە. چیتر ناتوانیت سوود لە خزمەتگوزارییەکانمان وەربگریت.');
                 return;
@@ -318,10 +331,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       if (unsubscribeAuth) unsubscribeAuth();
-      if (unsubscribeList) unsubscribeList();
+      cleanupUserListeners();
       if (unsubscribeReviews) unsubscribeReviews();
-      if (unsubscribeWatchlists) unsubscribeWatchlists();
-      if (unsubscribeHistory) unsubscribeHistory();
     };
   }, []);
 
