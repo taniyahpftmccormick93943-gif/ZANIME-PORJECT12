@@ -1,0 +1,219 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Public profile information for a user",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["displayName"]
+    },
+    "UserPrivateInfo": {
+      "title": "User Private Info",
+      "description": "Sensitive user information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["email"]
+    },
+    "MovieSummary": {
+      "title": "Movie Summary",
+      "description": "A shortened version of movie data for lists",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "year": { "type": "integer" }
+      },
+      "required": ["id", "title", "imageUrl"]
+    },
+    "CustomWatchlist": {
+      "title": "Custom Watchlist",
+      "description": "A named list of movies curated by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "ViewingHistory": {
+      "title": "Viewing History",
+      "description": "A record of a movie being watched",
+      "type": "object",
+      "properties": {
+        "movieId": { "type": "string" },
+        "lastWatched": { "type": "string", "format": "date-time" },
+        "progress": { "type": "integer", "description": "Progress in seconds or percentage" }
+      },
+      "required": ["movieId", "lastWatched"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A review for a movie",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "movieId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["movieId", "userId", "userName", "rating", "comment", "createdAt"]
+    },
+    "MovieStats": {
+      "title": "Movie Stats",
+      "description": "Global statistics for a movie",
+      "type": "object",
+      "properties": {
+        "viewCount": { "type": "integer" }
+      },
+      "required": ["viewCount"]
+    },
+    "Movie": {
+      "title": "Movie",
+      "description": "Full movie/series details",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "year": { "type": "integer" },
+        "rating": { "type": "number" },
+        "duration": { "type": "string" },
+        "genre": { "type": "array", "items": { "type": "string" } },
+        "imageUrl": { "type": "string" },
+        "backdropUrl": { "type": "string" },
+        "isNew": { "type": "boolean" },
+        "isTrending": { "type": "boolean" },
+        "isBanner": { "type": "boolean" },
+        "isPro": { "type": "boolean" },
+        "seasonsCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["Ongoing", "Finished"] },
+        "endYear": { "type": "string" },
+        "server1Url": { "type": "string" },
+        "server2Url": { "type": "string" }
+      },
+      "required": ["title", "imageUrl", "year"]
+    },
+    "Episode": {
+      "title": "Episode",
+      "description": "An episode of a series",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "duration": { "type": "string" },
+        "server1Url": { "type": "string" },
+        "server2Url": { "type": "string" },
+        "order": { "type": "integer" },
+        "seasonId": { "type": "string" }
+      },
+      "required": ["title", "order"]
+    },
+    "Season": {
+      "title": "Season",
+      "description": "A season of a series",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "number": { "type": "integer" },
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["number"]
+    },
+    "UserData": {
+      "title": "User Data",
+      "description": "Admin-level user data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["User", "Admin", "Owner"] },
+        "status": { "type": "string", "enum": ["Active", "Banned"] },
+        "subscriptionPlan": { "type": "string", "enum": ["none", "1day", "1month", "3months", "6months", "1year"] },
+        "subscriptionExpiry": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "status"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "Global application configuration",
+      "type": "object",
+      "properties": {
+        "telegramLink": { "type": "string" },
+        "plan_1day": { "type": "number" },
+        "plan_1month": { "type": "number" },
+        "plan_6months": { "type": "number" },
+        "plan_1year": { "type": "number" }
+      },
+      "required": ["telegramLink", "plan_1day", "plan_1month", "plan_6months", "plan_1year"]
+    }
+  },
+  "firestore": {
+    "/settings/app": {
+      "schema": "AppSettings",
+      "description": "Global app settings and pricing"
+    },
+    "/users/{userId}": {
+      "schema": "UserData",
+      "description": "User metadata for admin"
+    },
+    "/movies/{movieId}": {
+      "schema": "Movie",
+      "description": "Movies collection"
+    },
+    "/series/{seriesId}": {
+      "schema": "Movie",
+      "description": "Series collection"
+    },
+    "/series/{seriesId}/seasons/{seasonId}": {
+      "schema": "Season",
+      "description": "Seasons of a series"
+    },
+    "/series/{seriesId}/seasons/{seasonId}/episodes/{episodeId}": {
+      "schema": "Episode",
+      "description": "Episodes within a specific season"
+    },
+    "/users/{userId}/profile/data": {
+      "schema": "UserProfile",
+      "description": "Public user profile data"
+    },
+    "/users/{userId}/private/info": {
+      "schema": "UserPrivateInfo",
+      "description": "Private user information"
+    },
+    "/users/{userId}/myList/{movieId}": {
+      "schema": "MovieSummary",
+      "description": "User's saved movies"
+    },
+    "/users/{userId}/watchlists/{listId}": {
+      "schema": "CustomWatchlist",
+      "description": "User's custom named watchlists"
+    },
+    "/users/{userId}/watchlists/{listId}/movies/{movieId}": {
+      "schema": "MovieSummary",
+      "description": "Movies within a custom watchlist"
+    },
+    "/users/{userId}/history/{movieId}": {
+      "schema": "ViewingHistory",
+      "description": "User's viewing history"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Movie reviews"
+    },
+    "/movies/{movieId}/stats/data": {
+      "schema": "MovieStats",
+      "description": "Public movie statistics"
+    }
+  }
+}

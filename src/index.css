@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --color-netflix-red: #dc2626; /* red-600 */
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #050505;
+  color: #fff;
+  direction: rtl;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Glassmorphism helpers */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.hero-gradient {
+  background: linear-gradient(to right, #050505 0%, rgba(5,5,5,0.6) 40%, transparent 100%),
+              linear-gradient(to top, #050505 0%, transparent 30%);
+}
+
+.card-gradient {
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 60%);
+}
+
+.nav-gradient {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+}
