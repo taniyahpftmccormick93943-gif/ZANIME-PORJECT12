@@ -14,6 +14,8 @@ import { Movie } from '../types';
 import { collection, onSnapshot, query, getFirestore } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 export default function HomePage() {
   const { myList } = useAuth();
   const navigate = useNavigate();
@@ -24,10 +26,6 @@ export default function HomePage() {
   useEffect(() => {
     const initDb = async () => {
       try {
-        const configPath = '../../firebase-applet-config.json';
-        const configModule = await import(/* @vite-ignore */ configPath);
-        const firebaseConfig = configModule.default || configModule;
-        
         let app;
         if (getApps().length === 0) {
           app = initializeApp(firebaseConfig);

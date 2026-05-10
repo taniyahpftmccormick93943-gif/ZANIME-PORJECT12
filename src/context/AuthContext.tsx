@@ -76,6 +76,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 // Define a placeholder config
 let app: FirebaseApp | null = null;
 let auth: any = null;
@@ -85,11 +87,6 @@ const setupFirebase = async () => {
   if (app && auth && db) return { app, auth, db };
   
   try {
-    const configPath = '../../firebase-applet-config.json';
-    // @ts-ignore
-    const configModule = await import(/* @vite-ignore */ configPath);
-    const firebaseConfig = configModule.default || configModule;
-    
     if (getApps().length === 0) {
       app = initializeApp(firebaseConfig);
     } else {
@@ -110,7 +107,7 @@ const setupFirebase = async () => {
 
     return { app, auth, db };
   } catch (e) {
-    console.warn('Firebase config not found. Please set up Firebase in the UI.');
+    console.warn('Firebase config error:', e);
     return { app: null, auth: null, db: null };
   }
 };

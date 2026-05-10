@@ -24,6 +24,8 @@ import { initializeApp, getApps } from 'firebase/app';
 
 import { Movie, Episode, Season } from '../types';
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 const WatchPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, myList, watchlists, incrementMovieView } = useAuth();
@@ -44,10 +46,6 @@ const WatchPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const configPath = '../../firebase-applet-config.json';
-        const configModule = await import(/* @vite-ignore */ configPath);
-        const firebaseConfig = configModule.default || configModule;
-        
         let app;
         if (getApps().length === 0) {
           app = initializeApp(firebaseConfig);

@@ -10,6 +10,8 @@ import StarRating from '../components/StarRating';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 export default function MoviePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,10 +31,6 @@ export default function MoviePage() {
     
     const fetchData = async () => {
       try {
-        const configPath = '../../firebase-applet-config.json';
-        const configModule = await import(/* @vite-ignore */ configPath);
-        const firebaseConfig = configModule.default || configModule;
-        
         let app;
         if (getApps().length === 0) {
           app = initializeApp(firebaseConfig);

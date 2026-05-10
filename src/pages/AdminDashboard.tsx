@@ -54,6 +54,8 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
   </motion.div>
 );
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -85,10 +87,6 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     const initDb = async () => {
       try {
-        const configPath = '../../firebase-applet-config.json';
-        const configModule = await import(/* @vite-ignore */ configPath);
-        const firebaseConfig = configModule.default || configModule;
-        
         let app;
         if (getApps().length === 0) {
           app = initializeApp(firebaseConfig);

@@ -6,6 +6,8 @@ import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
 import { Movie } from '../types';
 import { useAuth } from '../context/AuthContext';
 
+import firebaseConfig from '../../firebase-applet-config.json';
+
 interface MovieCardProps {
   movie: Movie;
   showProgress?: boolean;
@@ -24,11 +26,6 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie, showProgress, onSelect, is
     
     const setupListener = async () => {
       try {
-        const configPath = '../../firebase-applet-config.json';
-        // @ts-ignore
-        const configModule = await import(/* @vite-ignore */ configPath);
-        const firebaseConfig = configModule.default || configModule;
-        
         let app;
         if (getApps().length === 0) {
           app = initializeApp(firebaseConfig);
