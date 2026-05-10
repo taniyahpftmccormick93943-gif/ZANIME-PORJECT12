@@ -77,8 +77,9 @@ service cloud.firestore {
 
     // User Data - Master Gate for all user content
     match /users/{userId} {
-      // Allows user to read their own account info
-      allow read: if isOwner(userId) || isAdmin();
+      // Allows user to read their own account info or admin to read all
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       
       allow create: if isOwner(userId) && (
         (incoming().role == 'User' && incoming().status == 'Active') ||

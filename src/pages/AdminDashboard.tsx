@@ -58,7 +58,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -88,10 +88,10 @@ const AdminDashboard: React.FC = () => {
   const OWNER_EMAIL = 'taniyahpftmccormick93943@gmail.com';
 
   useEffect(() => {
-    if (!loading && (!user || (user.role !== 'Admin' && user.role !== 'Owner'))) {
+    if (!loading && !authLoading && (!user || (user.role !== 'Admin' && user.role !== 'Owner'))) {
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, authLoading, navigate]);
 
   useEffect(() => {
     const initDb = async () => {

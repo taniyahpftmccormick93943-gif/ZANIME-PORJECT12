@@ -225,8 +225,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setDoc(doc(firestoreDb, metaPath), {
               role: 'Owner',
               status: 'Active',
-              name: firebaseUser.displayName,
-              email: firebaseUser.email
+              name: firebaseUser.displayName || 'خاوەن',
+              email: firebaseUser.email,
+              subscriptionPlan: 'pro_lifetime',
+              createdAt: serverTimestamp()
             }, { merge: true }).catch(e => console.error('Error setting owner role', e));
           }
 
