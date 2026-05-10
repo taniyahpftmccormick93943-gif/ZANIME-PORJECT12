@@ -108,16 +108,23 @@ const AdminDashboard: React.FC = () => {
         // Users
         const unsubscribeUsers = onSnapshot(query(collection(firestoreDb, 'users')), (snapshot) => {
           setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserData[]);
+        }, (error) => {
+          console.error("Users list error:", error);
+          showToast('هەڵەیەک لە خوێندنەوەی یوزەرەکان ڕوویدا', 'error');
         });
 
         // Movies
         const unsubscribeMovies = onSnapshot(query(collection(firestoreDb, 'movies')), (snapshot) => {
           setMovies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
+        }, (error) => {
+          console.error("Movies list error:", error);
         });
 
         // Series
         const unsubscribeSeries = onSnapshot(query(collection(firestoreDb, 'series')), (snapshot) => {
           setSeries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
+        }, (error) => {
+          console.error("Series list error:", error);
         });
 
         // App Settings
@@ -369,10 +376,12 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const searchLower = searchTerm.toLowerCase();
+    const nameMatch = u.name?.toLowerCase().includes(searchLower) || false;
+    const emailMatch = u.email?.toLowerCase().includes(searchLower) || false;
+    return nameMatch || emailMatch;
+  });
 
   const filteredMovies = movies.filter(m => m.title?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredSeries = series.filter(s => s.title?.toLowerCase().includes(searchTerm.toLowerCase()));

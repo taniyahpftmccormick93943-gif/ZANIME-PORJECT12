@@ -174,20 +174,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Setup User Profile listener in Firestore
           const profilePath = `users/${firebaseUser.uid}/profile/data`;
+          const metaPath = `users/${firebaseUser.uid}`;
           
-          // CRITICAL: First check if profile already exists in Firestore 
-          // before writing default Auth data to prevent overwriting custom large photos
+          // CRITICAL: First check if profile and user meta already exists in Firestore 
+          // before writing default Auth data to prevent overwriting
           try {
             const profileSnap = await getDocFromServer(doc(firestoreDb, profilePath));
             if (!profileSnap.exists()) {
-              // Only create if it doesn't exist
               await setDoc(doc(firestoreDb, profilePath), {
                 displayName: firebaseUser.displayName || '',
                 photoURL: firebaseUser.photoURL || '',
               });
             }
+
+            const metaSnap = await getDocFromServer(doc(firestoreDb, metaPath));
+            if (!metaSnap.exists()) {
+              // Create default user metadata so they appear in Admin Dashboard
+              await setDoc(doc(firestoreDb, metaPath), {
+                name: firebaseUser.displayName || 'بەکارهێنەر',
+                email: firebaseUser.email,
+                role: 'User',
+                status: 'Active',
+                subscriptionPlan: 'none',
+                createdAt: serverTimestamp()
+              });
+            }
           } catch (e) {
-            console.error('Initial profile check failed', e);
+            console.error('Initial profile/meta check failed', e);
           }
 
           // Listen to profile changes (to get the large photoURL and latest name)
@@ -207,9 +220,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             handleFirestoreError(error, OperationType.GET, profilePath, firebaseAuth);
           });
 
-          // Set role for Owner if email matches
+          // Set role for Owner if email matches (forced every login to ensure owner priority)
           if (firebaseUser.email === 'taniyahpftmccormick93943@gmail.com') {
-            setDoc(doc(firestoreDb, `users/${firebaseUser.uid}`), {
+            setDoc(doc(firestoreDb, metaPath), {
               role: 'Owner',
               status: 'Active',
               name: firebaseUser.displayName,
@@ -218,7 +231,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Listen to user metadata (role, status, subscription)
-          const metaPath = `users/${firebaseUser.uid}`;
           const unsubscribeMeta = onSnapshot(doc(firestoreDb, metaPath), (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
