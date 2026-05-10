@@ -34,6 +34,14 @@ service cloud.firestore {
       );
     }
 
+    function isNotBanned() {
+      return isSignedIn() && (
+        isSystemOwner() ||
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status != 'Banned'
+      );
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['role', 'status', 'email']) &&
              data.role is string && data.role in ['User', 'Admin', 'Owner'] &&
@@ -55,13 +63,18 @@ service cloud.firestore {
 
       match /stats/data {
         allow read: if true;
-        allow write: if isSignedIn();
+        allow write: if isNotBanned();
       }
     }
 
     match /series/{seriesId} {
       allow read: if true;
       allow write: if isAdmin();
+
+      match /stats/data {
+        allow read: if true;
+        allow write: if isNotBanned();
+      }
 
       match /{allPaths=**} {
         allow read: if true;
@@ -86,19 +99,19 @@ service cloud.firestore {
         isSystemOwner()
       );
       
-      allow update: if (isOwner(userId) && incoming().role == existing().role && incoming().status == existing().status) || isAdmin();
+      allow update: if (isOwner(userId) && incoming().role == existing().role && incoming().status == existing().status && isNotBanned()) || isAdmin();
 
       // Deep wildcard for all subcollections (myList, watchlists, history, private, profile)
       match /{allPaths=**} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if (isOwner(userId) && isNotBanned()) || isAdmin();
       }
     }
 
     // Reviews
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isNotBanned();
+      allow update, delete: if isAdmin() || (isNotBanned() && resource.data.userId == request.auth.uid);
     }
 
     // Connection test document

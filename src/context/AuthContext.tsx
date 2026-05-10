@@ -236,6 +236,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const unsubscribeMeta = onSnapshot(doc(firestoreDb, metaPath), (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
+              
+              // CHECK FOR BAN
+              if (data.status === 'Banned') {
+                logout();
+                alert('ئەکاونتەکەت باند کراوە. چیتر ناتوانیت سوود لە خزمەتگوزارییەکانمان وەربگریت.');
+                return;
+              }
+
               setUser((prev: any) => ({
                 ...prev,
                 role: data.role || 'User',
