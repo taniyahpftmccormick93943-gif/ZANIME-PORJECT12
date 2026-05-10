@@ -140,14 +140,16 @@ export default function Navbar() {
                         <span>پرۆفایلەکەم</span>
                       </Link>
 
-                      <Link 
-                        to="/admin" 
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-sm text-gray-300 hover:text-white text-right"
-                      >
-                        <Shield size={16} />
-                        <span>ئەدمین داشبۆرد</span>
-                      </Link>
+                      {user && (user.role === 'Admin' || user.role === 'Owner') && (
+                        <Link 
+                          to="/admin" 
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-sm text-gray-300 hover:text-white text-right"
+                        >
+                          <Shield size={16} />
+                          <span>ئەدمین داشبۆرد</span>
+                        </Link>
+                      )}
 
                       <div className="h-[1px] bg-white/5 my-1" />
 

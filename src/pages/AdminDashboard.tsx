@@ -34,6 +34,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, addDoc, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Movie, AppSettings, UserData, Episode, Season } from '../types';
@@ -57,6 +58,8 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const AdminDashboard: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [series, setSeries] = useState<Movie[]>([]);
@@ -83,6 +86,12 @@ const AdminDashboard: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Movie>>({});
 
   const OWNER_EMAIL = 'taniyahpftmccormick93943@gmail.com';
+
+  useEffect(() => {
+    if (!loading && (!user || (user.role !== 'Admin' && user.role !== 'Owner'))) {
+      navigate('/');
+    }
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     const initDb = async () => {

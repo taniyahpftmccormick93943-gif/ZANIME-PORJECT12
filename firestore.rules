@@ -12,6 +12,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     // Hardcoded owner for bootstrapping
     function isSystemOwner() {
       return isSignedIn() && request.auth.token.email == 'taniyahpftmccormick93943@gmail.com';
@@ -24,6 +32,13 @@ service cloud.firestore {
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Owner'])
       );
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['role', 'status', 'email']) &&
+             data.role is string && data.role in ['User', 'Admin', 'Owner'] &&
+             data.status is string && data.status in ['Active', 'Banned'] &&
+             data.email is string && data.email.size() <= 256;
     }
 
     // Default deny all
@@ -64,8 +79,13 @@ service cloud.firestore {
     match /users/{userId} {
       // Allows user to read their own account info
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && (
+        (incoming().role == 'User' && incoming().status == 'Active') ||
+        isSystemOwner()
+      );
+      
+      allow update: if (isOwner(userId) && incoming().role == existing().role && incoming().status == existing().status) || isAdmin();
 
       // Deep wildcard for all subcollections (myList, watchlists, history, private, profile)
       match /{allPaths=**} {
