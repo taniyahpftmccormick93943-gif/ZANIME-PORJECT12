@@ -21,9 +21,11 @@ import {
   addDoc as firestoreAddDoc,
   serverTimestamp,
   getDocFromServer,
+  getDoc,
   increment,
   updateDoc,
-  Firestore
+  Firestore,
+  getDocs
 } from 'firebase/firestore';
 
 export enum OperationType {
@@ -134,12 +136,43 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => {
+    const cached = localStorage.getItem('auth_user_cache');
+    return cached ? JSON.parse(cached) : null;
+  });
   const [loading, setLoading] = useState(true);
-  const [myList, setMyList] = useState<any[]>([]);
+  const [myList, setMyList] = useState<any[]>(() => {
+    const cached = localStorage.getItem('my_list_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
   const [reviews, setReviews] = useState<any[]>([]);
-  const [watchlists, setWatchlists] = useState<any[]>([]);
-  const [viewingHistory, setViewingHistory] = useState<any[]>([]);
+  const [watchlists, setWatchlists] = useState<any[]>(() => {
+    const cached = localStorage.getItem('watchlists_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [viewingHistory, setViewingHistory] = useState<any[]>(() => {
+    const cached = localStorage.getItem('history_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('auth_user_cache', JSON.stringify(user));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem('my_list_cache', JSON.stringify(myList));
+  }, [myList]);
+
+  useEffect(() => {
+    localStorage.setItem('watchlists_cache', JSON.stringify(watchlists));
+  }, [watchlists]);
+
+  useEffect(() => {
+    localStorage.setItem('history_cache', JSON.stringify(viewingHistory));
+  }, [viewingHistory]);
 
   useEffect(() => {
     let unsubscribeAuth: any = null;
@@ -156,6 +189,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (unsubscribeMeta) { unsubscribeMeta(); unsubscribeMeta = null; }
       if (unsubscribeWatchlists) { unsubscribeWatchlists(); unsubscribeWatchlists = null; }
       if (unsubscribeHistory) { unsubscribeHistory(); unsubscribeHistory = null; }
+    };
+
+    const fetchUserDataOnce = async (uid: string, firestoreDb: any) => {
+      try {
+        const listPath = `users/${uid}/myList`;
+        const listSnap = await getDocs(collection(firestoreDb, listPath));
+        setMyList(listSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        const watchlistsPath = `users/${uid}/watchlists`;
+        const watchSnap = await getDocs(collection(firestoreDb, watchlistsPath));
+        setWatchlists(watchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        const historyPath = `users/${uid}/history`;
+        const histSnap = await getDocs(collection(firestoreDb, historyPath));
+        setViewingHistory(histSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (e: any) {
+        if (e.message?.includes('quota-exceeded') || e.message?.includes('resource-exhausted')) {
+          setQuotaExceeded(true);
+        }
+        console.error("Error fetching user data:", e);
+      }
     };
 
     const init = async () => {
@@ -191,7 +245,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // CRITICAL: First check if profile and user meta already exists in Firestore 
           // before writing default Auth data to prevent overwriting
           try {
-            const profileSnap = await getDocFromServer(doc(firestoreDb, profilePath));
+            // Use getDoc (can use cache) instead of getDocFromServer to save quota
+            const profileSnap = await getDoc(doc(firestoreDb, profilePath));
             if (!profileSnap.exists()) {
               await setDoc(doc(firestoreDb, profilePath), {
                 displayName: firebaseUser.displayName || '',
@@ -199,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
             }
 
-            const metaSnap = await getDocFromServer(doc(firestoreDb, metaPath));
+            const metaSnap = await getDoc(doc(firestoreDb, metaPath));
             if (!metaSnap.exists()) {
               // Create default user metadata so they appear in Admin Dashboard
               await setDoc(doc(firestoreDb, metaPath), {
@@ -210,10 +265,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 subscriptionPlan: 'none',
                 createdAt: serverTimestamp()
               });
+            } else {
+              // Check for ban immediately on first load
+              const data = metaSnap.data();
+              if (data.status === 'Banned') {
+                await signOut(firebaseAuth);
+                setUser(null);
+                setLoading(false);
+                alert('ئەکاونتەکەت باند کراوە. چیتر ناتوانیت سوود لە خزمەتگوزارییەکانمان وەربگریت.');
+                return;
+              }
             }
-          } catch (e) {
+          } catch (e: any) {
+            if (e.message?.includes('quota-exceeded') || e.message?.includes('resource-exhausted')) {
+              setQuotaExceeded(true);
+            }
             console.error('Initial profile/meta check failed', e);
           }
+
+          // Initial data fetch (One-time instead of continuous snapshots to save quota)
+          fetchUserDataOnce(firebaseUser.uid, firestoreDb);
 
           // Listen to profile changes (to get the large photoURL and latest name)
           unsubscribeProfile = onSnapshot(doc(firestoreDb, profilePath), (snapshot) => {
@@ -229,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
             }
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, profilePath, firebaseAuth);
+            // handle errors
           });
 
           // Set role for Owner if email matches (forced every login to ensure owner priority)
@@ -252,7 +323,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // CHECK FOR BAN
               if (data.status === 'Banned') {
                 cleanupUserListeners();
-                logout();
+                signOut(firebaseAuth);
+                setUser(null);
                 alert('ئەکاونتەکەت باند کراوە. چیتر ناتوانیت سوود لە خزمەتگوزارییەکانمان وەربگریت.');
                 return;
               }
@@ -266,40 +338,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }));
             }
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, metaPath, firebaseAuth);
+            // handle error
           });
 
           const privatePath = `users/${firebaseUser.uid}/private/info`;
           setDoc(doc(firestoreDb, privatePath), {
             email: firebaseUser.email,
           }, { merge: true }).catch(err => console.error('Error saving private info', err));
-
-          // Listen to My List
-          const listPath = `users/${firebaseUser.uid}/myList`;
-          unsubscribeList = onSnapshot(collection(firestoreDb, listPath), (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setMyList(list);
-          }, (error) => {
-            handleFirestoreError(error, OperationType.LIST, listPath, firebaseAuth);
-          });
-
-          // Listen to Watchlists
-          const watchlistsPath = `users/${firebaseUser.uid}/watchlists`;
-          unsubscribeWatchlists = onSnapshot(collection(firestoreDb, watchlistsPath), (snapshot) => {
-            const lists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setWatchlists(lists);
-          }, (error) => {
-            handleFirestoreError(error, OperationType.LIST, watchlistsPath, firebaseAuth);
-          });
-
-          // Listen to History
-          const historyPath = `users/${firebaseUser.uid}/history`;
-          unsubscribeHistory = onSnapshot(collection(firestoreDb, historyPath), (snapshot) => {
-            const hist = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setViewingHistory(hist);
-          }, (error) => {
-            handleFirestoreError(error, OperationType.LIST, historyPath, firebaseAuth);
-          });
 
         } else {
           const currentManual = localStorage.getItem('manual_user');
@@ -313,17 +358,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       });
 
-      // Global Reviews Listen (only most recent 50)
+      // Global Reviews Listen (only most recent 20)
       const reviewsPath = 'reviews';
-      unsubscribeReviews = onSnapshot(collection(firestoreDb, reviewsPath), (snapshot) => {
+      const { limit, query: fsQuery, orderBy } = await import('firebase/firestore');
+      unsubscribeReviews = onSnapshot(fsQuery(collection(firestoreDb, reviewsPath), orderBy('createdAt', 'desc'), limit(20)), (snapshot) => {
         const revs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setReviews(revs.sort((a: any, b: any) => {
-           const timeA = a.createdAt?.seconds || 0;
-           const timeB = b.createdAt?.seconds || 0;
-           return timeB - timeA;
-        }));
+        setReviews(revs);
       }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, reviewsPath, firebaseAuth);
+        // handle error
       });
     };
 

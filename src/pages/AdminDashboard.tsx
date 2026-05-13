@@ -63,6 +63,7 @@ const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [series, setSeries] = useState<Movie[]>([]);
+  const [fetchedTabs, setFetchedTabs] = useState<Set<AdminTab>>(new Set());
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ id: string, type: 'user' | 'movie' | 'series' } | null>(null);
@@ -105,47 +106,61 @@ const AdminDashboard: React.FC = () => {
         const firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
         setDb(firestoreDb);
 
-        // Users
-        const unsubscribeUsers = onSnapshot(query(collection(firestoreDb, 'users')), (snapshot) => {
-          setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserData[]);
-        }, (error) => {
-          console.error("Users list error:", error);
-          showToast('هەڵەیەک لە خوێندنەوەی یوزەرەکان ڕوویدا', 'error');
-        });
-
-        // Movies
-        const unsubscribeMovies = onSnapshot(query(collection(firestoreDb, 'movies')), (snapshot) => {
-          setMovies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
-        }, (error) => {
-          console.error("Movies list error:", error);
-        });
-
-        // Series
-        const unsubscribeSeries = onSnapshot(query(collection(firestoreDb, 'series')), (snapshot) => {
-          setSeries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
-        }, (error) => {
-          console.error("Series list error:", error);
-        });
-
-        // App Settings
-        const settingsDoc = await getDoc(doc(firestoreDb, 'settings', 'app'));
-        if (settingsDoc.exists()) {
-          setAppSettings(settingsDoc.data() as AppSettings);
+        // App Settings - fetch once
+        try {
+          const settingsDoc = await getDoc(doc(firestoreDb, 'settings', 'app'));
+          if (settingsDoc.exists()) {
+            setAppSettings(settingsDoc.data() as AppSettings);
+          }
+        } catch (e) {
+          console.error("Settings fetch failed", e);
         }
-
+        
         setLoading(false);
-        return () => {
-          unsubscribeUsers();
-          unsubscribeMovies();
-          unsubscribeSeries();
-        };
       } catch (e) {
         console.error("Firebase load failed", e);
+        setLoading(false);
       }
     };
 
     initDb();
   }, []);
+
+  useEffect(() => {
+    if (!db || fetchedTabs.has(activeTab)) return;
+
+    const fetchDataForTab = async () => {
+      setLoading(true);
+      try {
+        if (activeTab === 'users') {
+          const usersSnap = await getDocs(collection(db, 'users'));
+          setUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserData[]);
+        } else if (activeTab === 'movies') {
+          const moviesSnap = await getDocs(collection(db, 'movies'));
+          setMovies(moviesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
+        } else if (activeTab === 'series') {
+          const seriesSnap = await getDocs(collection(db, 'series'));
+          setSeries(seriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Movie[]);
+        }
+        setFetchedTabs(prev => new Set(prev).add(activeTab));
+      } catch (e: any) {
+        if (e.message?.includes('quota-exceeded')) {
+          showToast('هەڵەی کووتا (Quota Exceeded): ناتوانرێت داتا بخوێنرێتەوە', 'error');
+        }
+        console.error(`Fetch failed for ${activeTab}:`, e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDataForTab();
+  }, [activeTab, db]);
+
+  const refreshTab = () => {
+    const newFetched = new Set(fetchedTabs);
+    newFetched.delete(activeTab);
+    setFetchedTabs(newFetched);
+  };
 
   useEffect(() => {
     if (contentModal?.data && contentModal.type === 'series' && db) {
@@ -208,6 +223,7 @@ const AdminDashboard: React.FC = () => {
     if (!db) return;
     try {
       await updateDoc(doc(db, 'users', id), { role: newRole });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, role: newRole } : u));
       showToast('پلەی بەکارهێنەر گۆڕدرا');
     } catch (e) {
       showToast('هەڵەیەک ڕوویدا', 'error');
@@ -225,10 +241,12 @@ const AdminDashboard: React.FC = () => {
       else if (plan === '1year') expiry.setFullYear(expiry.getFullYear() + 1);
       else expiry = new Date(0); // For 'none'
 
-      await updateDoc(doc(db, 'users', id), { 
+      const updateData = { 
         subscriptionPlan: plan,
         subscriptionExpiry: plan === 'none' ? null : expiry.toISOString()
-      });
+      };
+      await updateDoc(doc(db, 'users', id), updateData);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updateData } : u));
       showToast('بۆ پلانی پرۆ چالاک کرا');
     } catch (e) {
       showToast('هەڵەیەک ڕوویدا', 'error');
@@ -237,11 +255,12 @@ const AdminDashboard: React.FC = () => {
 
   const handleStatusToggle = async (id: string) => {
     if (!db) return;
-    const user = users.find(u => u.id === id);
-    if (!user) return;
+    const userToToggle = users.find(u => u.id === id);
+    if (!userToToggle) return;
     try {
-      const newStatus = user.status === 'Active' ? 'Banned' : 'Active';
+      const newStatus = userToToggle.status === 'Active' ? 'Banned' : 'Active';
       await updateDoc(doc(db, 'users', id), { status: newStatus });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus } : u));
       showToast(newStatus === 'Banned' ? 'بلۆک کرا' : 'چالاک کرایەوە', newStatus === 'Banned' ? 'error' : 'success');
     } catch (e) {
       showToast('هەڵەیەک ڕوویدا', 'error');
@@ -266,6 +285,11 @@ const AdminDashboard: React.FC = () => {
         const docId = contentModal.data.id;
         await updateDoc(doc(db, collectionName, docId), data);
         
+        // Update local state
+        const updateState = (prev: any[]) => prev.map(m => m.id === docId ? { ...m, ...data } : m);
+        if (contentModal.type === 'movie') setMovies(updateState);
+        else setSeries(updateState);
+
         // Handle Seasons and Episodes for series
         if (contentModal.type === 'series') {
           for (const season of seasons) {
@@ -307,7 +331,11 @@ const AdminDashboard: React.FC = () => {
         showToast('بە سەرکەوتوویی نوێکرایەوە');
       } else {
         const newDoc = await addDoc(collection(db, collectionName), data);
+        const newItem = { id: newDoc.id, ...data } as any;
         
+        if (contentModal.type === 'movie') setMovies(prev => [newItem, ...prev]);
+        else setSeries(prev => [newItem, ...prev]);
+
         // Handle Seasons and Episodes for new series
         if (contentModal.type === 'series') {
           for (const season of seasons) {
@@ -348,15 +376,18 @@ const AdminDashboard: React.FC = () => {
 
     try {
       if (type === 'user') {
-        const user = users.find(u => u.id === id);
-        if (user?.role === 'Owner') {
+        const userToDelete = users.find(u => u.id === id);
+        if (userToDelete?.role === 'Owner') {
           showToast('ناتوانیت خاوەن بسڕێتەوە!', 'error');
         } else {
           await deleteDoc(doc(db, 'users', id));
+          setUsers(prev => prev.filter(u => u.id !== id));
           showToast('بەکارهێنەر سڕایەوە');
         }
       } else {
         await deleteDoc(doc(db, type === 'movie' ? 'movies' : 'series', id));
+        if (type === 'movie') setMovies(prev => prev.filter(m => m.id !== id));
+        else setSeries(prev => prev.filter(m => m.id !== id));
         showToast('ناوەڕۆکەکە سڕایەوە');
       }
     } catch (e) {
@@ -402,6 +433,14 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4 w-full md:w-auto">
+            <button 
+              onClick={refreshTab}
+              className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-4 rounded-2xl font-black text-sm flex items-center gap-2 transition-all group"
+              title="بارکردنەوەی داتا"
+            >
+              <Zap size={18} className="group-hover:text-yellow-500 transition-colors" />
+              نوێکردنەوە
+            </button>
             <Link to="/" className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-4 rounded-2xl font-black text-sm flex items-center gap-2 transition-all">
               <Home size={18} />
               ماڵەوە

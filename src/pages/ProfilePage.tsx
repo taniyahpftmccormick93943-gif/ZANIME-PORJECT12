@@ -92,11 +92,11 @@ const ProfilePage: React.FC = () => {
               <h1 className="text-4xl md:text-5xl font-black mb-2 tracking-tight">{user.displayName}</h1>
               <p className="text-zinc-500 font-medium mb-2">{user.email}</p>
               
-              {(user as any).subscriptionPlan && (user as any).subscriptionPlan !== 'none' && (
+              {((user as any).role === 'Admin' || (user as any).role === 'Owner' || (user.subscriptionPlan !== 'none' && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date())) && (
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-6 bg-red-600/10 w-fit px-4 py-2 rounded-2xl border border-red-600/20 mx-auto md:mx-0">
                   <div className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase">PRO</div>
                   <span className="text-red-500 text-xs font-bold">
-                    بەسەردەچێت لە: {(() => {
+                    {(user as any).role === 'Owner' || (user as any).role === 'Admin' || (user as any).subscriptionPlan === 'pro_lifetime' ? 'هەمیشەیی' : `بەسەردەچێت لە: ${(() => {
                       try {
                         const expiry = (user as any).subscriptionExpiry;
                         if (!expiry) return '---';
@@ -106,7 +106,7 @@ const ProfilePage: React.FC = () => {
                       } catch (e) {
                         return '---';
                       }
-                    })()}
+                    })()}`}
                   </span>
                 </div>
               )}

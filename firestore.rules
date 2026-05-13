@@ -99,11 +99,16 @@ service cloud.firestore {
         isSystemOwner()
       );
       
+      // Update requires not being banned
       allow update: if (isOwner(userId) && incoming().role == existing().role && incoming().status == existing().status && isNotBanned()) || isAdmin();
 
-      // Deep wildcard for all subcollections (myList, watchlists, history, private, profile)
+      // Subcollections (myList, watchlists, history, private, profile)
       match /{allPaths=**} {
-        allow read, write: if (isOwner(userId) && isNotBanned()) || isAdmin();
+        // We allow reading own data without isNotBanned check to save reading units. 
+        // The client-side logic will handle UI blocking if banned.
+        allow read: if isOwner(userId) || isAdmin();
+        // Writes MUST check if banned
+        allow write: if (isOwner(userId) && isNotBanned()) || isAdmin();
       }
     }
 
